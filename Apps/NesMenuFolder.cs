@@ -1,7 +1,5 @@
 ﻿using com.clusterrr.hakchi_gui.Properties;
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -32,8 +30,7 @@ namespace com.clusterrr.hakchi_gui
             Left = 1,
             Right = 3,
             Rightmost = 4,
-            Back = 5,
-            LeftBack = 6
+            Back = 5
         }
         private Priority position;
 
@@ -79,23 +76,17 @@ namespace com.clusterrr.hakchi_gui
                 position = value;
                 switch (position)
                 {
-                    case Priority.LeftBack:
+                    case Priority.Leftmost:
                         desktop.Players = 2;
                         desktop.Simultaneous = true;
                         desktop.ReleaseDate = "0000-00-00";
                         desktop.Publisher = new String((char)1, 10);
                         break;
-                    case Priority.Leftmost:
-                        desktop.Players = 2;
-                        desktop.Simultaneous = true;
-                        desktop.ReleaseDate = "0001-11-11";
-                        desktop.Publisher = new String((char)2, 10);
-                        break;
                     case Priority.Left:
                         desktop.Players = 2;
                         desktop.Simultaneous = true;
-                        desktop.ReleaseDate = "0002-22-22";
-                        desktop.Publisher = new String((char)3, 10);
+                        desktop.ReleaseDate = "1111-11-11";
+                        desktop.Publisher = new String((char)2, 10);
                         break;
                     case Priority.Right:
                         desktop.Players = 1;
@@ -123,12 +114,11 @@ namespace com.clusterrr.hakchi_gui
             }
         }
 
-        public NesMenuFolder(string name = "Folder", string imageId = "folder", string imageSet = null)
+        public NesMenuFolder(string name = "Folder", string imageId = "folder")
             : base()
         {
             desktop.Name = name;
             Position = Priority.Right;
-            ImageSet = imageSet ?? ConfigIni.Instance.FolderImagesSet;
             ImageId = imageId;
             desktop.Players = 2;
             desktop.Simultaneous = true;
@@ -140,16 +130,16 @@ namespace com.clusterrr.hakchi_gui
         {
             get
             {
-                string imagePath = getImagePath(imageId);
-                if (imagePath != null)
+                var filePath = Path.Combine(FolderImagesDirectory, imageId + ".png");
+                if (File.Exists(filePath))
                 {
-                    return Image.FromFile(imagePath);
+                    return Image.FromFile(filePath);
                 }
-                else if (imageId != null && rm.GetObject(imageId) != null)
+                else if (rm.GetObject(imageId) != null)
                 {
                     return (Image)rm.GetObject(imageId);
                 }
-                return (Image)rm.GetObject("folder");
+                return null;
             }
         }
 
@@ -161,90 +151,22 @@ namespace com.clusterrr.hakchi_gui
             }
         }
 
-        private string imageSet;
-        public string ImageSet
-        {
-            get { return imageSet; }
-            set
-            {
-                imageSet = null;
-                if (value != null && Directory.Exists(Path.Combine(FolderImagesDirectory, value)))
-                {
-                    imageSet = value;
-                }
-            }
-        }
-
         private string imageId;
         public string ImageId
         {
             get { return imageId; }
             set
             {
-                if (value == null)
-                {
-                    imageId = null;
-                    return;
-                }
-
-                if (getImagePath(value) != null || rm.GetObject(value) != null)
+                var filePath = Path.Combine(FolderImagesDirectory, value + ".png");
+                if (File.Exists(filePath) || rm.GetObject(value) != null)
                 {
                     imageId = value;
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Folder image id \"{value??"NULL"}\" is invalid. No corresponding file or resource exists.");
-                    imageId = "folder";
+                    throw new FileNotFoundException($"Folder image id \"{imageId}\" is invalid. No corresponding file or resource exists.");
                 }
             }
-        }
-
-        private string getImagePath(string id)
-        {
-            if (id == null)
-                return null;
-            string imagePath = Path.Combine(FolderImagesDirectory, id + ".png");
-            string overrideImagePath = imageSet != null ? Path.Combine(FolderImagesDirectory, imageSet, id + ".png") : imagePath;
-            if (File.Exists(overrideImagePath))
-                return overrideImagePath;
-            if (File.Exists(imagePath))
-                return imagePath;
-            return null;
-        }
-
-        private DesktopFile getAdjustedDesktopFile()
-        {
-            var newDesktop = (DesktopFile)desktop.Clone();
-            char prefix;
-            switch (position)
-            {
-                case Priority.LeftBack:
-                    prefix = (char)1;
-                    break;
-                case Priority.Leftmost:
-                    prefix = (char)2;
-                    break;
-                default:
-                case Priority.Left:
-                    prefix = (char)3;
-                    break;
-                case Priority.Right:
-                    prefix = 'Э';
-                    break;
-                case Priority.Rightmost:
-                    prefix = 'Ю';
-                    break;
-                case Priority.Back:
-                    prefix = 'Я';
-                    break;
-            }
-            newDesktop.Exec = string.Format("/bin/chmenu {0:D3} {1}", childIndex, hakchi.GamesPath);
-            newDesktop.ProfilePath = hakchi.GamesProfilePath + "/FOLDER";
-            newDesktop.IconPath = hakchi.GamesPath;
-            newDesktop.IconFilename = desktop.Code + ".png";
-            newDesktop.TestId = 777;
-            newDesktop.SortName = prefix + (desktop.Name ?? desktop.Code).ToLower();
-            return newDesktop;
         }
 
         public void SetOutputPath(string path)
@@ -260,68 +182,38 @@ namespace com.clusterrr.hakchi_gui
                 return false;
 
             Directory.CreateDirectory(basePath);
-            getAdjustedDesktopFile().Save(Path.Combine(basePath, desktop.Code + ".desktop"), false, true);
+            char prefix;
+            switch (position)
+            {
+                case Priority.Leftmost:
+                    prefix = (char)1;
+                    break;
+                default:
+                case Priority.Left:
+                    prefix = (char)2;
+                    break;
+                case Priority.Right:
+                    prefix = 'Э';
+                    break;
+                case Priority.Rightmost:
+                    prefix = 'Ю';
+                    break;
+                case Priority.Back:
+                    prefix = 'Я';
+                    break;
+            }
+            desktop.Exec = string.Format("/bin/chmenu {0:D3} {1}", childIndex, hakchi.GamesPath);
+            desktop.ProfilePath = hakchi.GamesProfilePath + "/FOLDER";
+            desktop.IconPath = hakchi.GamesPath;
+            desktop.IconFilename = desktop.Code + ".png";
+            desktop.TestId = 777;
+            desktop.SortName = prefix + (desktop.Name ?? desktop.Code).ToLower();
+            desktop.Save(Path.Combine(basePath, desktop.Code + ".desktop"), false, true);
 
-            var sourcePath = getImagePath(ImageId);
-            if (sourcePath != null)
-            {
-                var smallSourcePath = sourcePath.Replace(".png", "_small.png");
-                if (!File.Exists(smallSourcePath))
-                    smallSourcePath = sourcePath;
-                ProcessImageFile(sourcePath, iconPath, 204, 204, true, false, false);
-                ProcessImageFile(smallSourcePath, smallIconPath, 40, 40, true, false, false);
-            }
-            else
-            {
-                ProcessImage(Image, iconPath, 204, 204, true, false, false);
-                ProcessImage(Image, smallIconPath, 40, 40, true, false, false);
-            }
+            var filePath = Path.Combine(FolderImagesDirectory, ImageId + ".png");
+            ProcessImageFile(filePath, iconPath, 204, 204, true, false, false);
+            ProcessImageFile(filePath, smallIconPath, 40, 40, true, false, false);
             return true;
         }
-
-        public NesMenuFolder CopyTo(string path)
-        {
-            SetOutputPath(path);
-            Save();
-            return this;
-        }
-
-        public long CopyTo(string relativeTargetPath, HashSet<ApplicationFileInfo> localGameSet)
-        {
-            string targetDir = relativeTargetPath.Trim('/') + "/" + desktop.Code;
-
-            var desktopStream = getAdjustedDesktopFile().SaveTo(new MemoryStream(), false, true);
-            localGameSet.Add(new ApplicationFileInfo($"./{targetDir}/{desktop.Code}.desktop", DateTime.UtcNow, desktopStream));
-
-            var sourcePath = getImagePath(ImageId);
-            Stream iconStream, smallIconStream;
-            if (sourcePath != null)
-            {
-                var smallSourcePath = sourcePath.Replace(".png", "_small.png");
-                if (!File.Exists(smallSourcePath))
-                    smallSourcePath = sourcePath;
-                iconStream = ProcessImageFileToStream(sourcePath, 204, 204, true, false, false);
-                smallIconStream = ProcessImageFileToStream(smallSourcePath, 40, 40, true, false, false);
-
-                localGameSet.Add(new ApplicationFileInfo($"./{targetDir}/{desktop.Code}.png", File.GetLastWriteTimeUtc(sourcePath), iconStream));
-                localGameSet.Add(new ApplicationFileInfo($"./{targetDir}/{desktop.Code}_small.png", File.GetLastWriteTimeUtc(smallSourcePath), smallIconStream));
-            }
-            else
-            {
-                iconStream = ProcessImageToStream(Image, 204, 204, true, false, false);
-                smallIconStream = ProcessImageToStream(Image, 40, 40, true, false, false);
-
-                localGameSet.Add(new ApplicationFileInfo($"./{targetDir}/{desktop.Code}.png", DateTime.UtcNow, iconStream));
-                localGameSet.Add(new ApplicationFileInfo($"./{targetDir}/{desktop.Code}_small.png", DateTime.UtcNow, smallIconStream));
-            }
-
-            long calculatedSize =
-                Shared.PadFileSize(desktopStream.Length, hakchi.BLOCK_SIZE) +
-                Shared.PadFileSize(iconStream.Length, hakchi.BLOCK_SIZE) +
-                Shared.PadFileSize(smallIconStream.Length, hakchi.BLOCK_SIZE);
-
-            return calculatedSize;
-        }
-
     }
 }
