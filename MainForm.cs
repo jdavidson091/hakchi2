@@ -2779,5 +2779,10 @@ namespace com.clusterrr.hakchi_gui
                 ConfigIni.Instance.SyncGamesCollectionsStructureSettings();
             }
         }
+
+        private void modStoreToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            new ModStore().ShowDialog();
+        }
     }
 }
